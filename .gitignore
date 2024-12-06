@@ -1,0 +1,4 @@
+agent/kubezonnet_bpfeb.o
+agent/kubezonnet_bpfel.o
+kubezonnet-agent
+kubezonnet-server

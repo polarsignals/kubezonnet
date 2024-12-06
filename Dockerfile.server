@@ -1,0 +1,3 @@
+FROM cgr.dev/chainguard/static
+ADD kubezonnet-server /kubezonnet-server
+ENTRYPOINT ["/kubezonnet-server"]

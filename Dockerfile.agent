@@ -1,0 +1,4 @@
+FROM cgr.dev/chainguard/static
+USER root
+ADD kubezonnet-agent /kubezonnet-agent
+ENTRYPOINT ["/kubezonnet-agent"]
