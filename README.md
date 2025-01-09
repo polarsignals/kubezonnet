@@ -14,6 +14,10 @@ Kubezonnet is designed to be deployed on Kubernetes, so nothing special is requi
 kubectl apply -f https://raw.githubusercontent.com/polarsignals/kubezonnet/refs/heads/main/deploy/kubezonnet.yaml
 ```
 
+Container images are published at:
+* agent: `ghcr.io/polarsignals/kubezonnet-agent`
+* server: `ghcr.io/polarsignals/kubezonnet-server`
+
 ## Requirements
 
 * Cilium as the CNI (in Legacy host routing mode, otherwise netfilter won't work correctly, GKE dataplane v2 clusters use this mode)
