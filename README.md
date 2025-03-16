@@ -29,8 +29,7 @@ Kubezonnet is made up of two components:
 
 * kubezonnet-agent: collects traffic statistics, using eBPF with a netfilter postrouting hook, about all Pod network traffic and sends the statistics to the server. This component is
  deployed on all nodes. It aggregates the statistics per source and destination IP and sends them to the server every 10 seconds.
-* kubezonnet-server: aggregates the statistics sent from the agents and resolves the actual pod, node and zone relationships of the network statistics, and then exposes the statistic
-s on a Prometheus metrics endpoint. This component can either be deployed once per cluster, or for each zone (once again to save cross-zone traffic).
+* kubezonnet-server: aggregates the statistics sent from the agents and resolves the actual pod, node and zone relationships of the network statistics, and then exposes the statistics on a Prometheus metrics endpoint. This component can either be deployed once per cluster, or for each zone (once again to save cross-zone traffic).
 
 ## How do I use it?
 
