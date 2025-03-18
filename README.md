@@ -4,7 +4,12 @@
 
 ## Why?
 
-Same-zone traffic is free on cloud providers, cross-zone traffic is not, and can easily become a major cost factor if a lot of data is moved over the network. Therefore, understanding which workloads are causing cross-zone traffic is vital.
+While same-zone traffic is free on cloud providers, cross-zone traffic is not and can easily become a major cost factor if a lot of data is moved over the network. Therefore, understanding which workloads are causing cross-zone traffic is vital.
+
+### Articles
+
+Read The New Stack article: [eBPF Tool Identifies Cross-Zone Kubernetes Network Traffic](https://thenewstack.io/ebpf-tool-identifies-cross-zone-kubernetes-network-traffic/)  
+Read our blog post: [kubezonnet: Monitor Cross-Zone Network Traffic in Kubernetes](https://www.polarsignals.com/blog/posts/2025/01/09/introducing-kubezonnet)
 
 ## Deploy
 
