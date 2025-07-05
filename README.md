@@ -67,7 +67,7 @@ twork traffic associated whenever agents send statistics (every 10 seconds).
 * Currently only supports IPv4.
 * Traffic statistics use the IP packet sizes, therefore skip the IP header part. It's recommended to use these statistics to understand ratios of traffic and not use it for metering purposes or comparing them to other lower level network statistics that include the IP header.
 
-## Roapmap
+## Roadmap
 
 * Support for IPv6.
 * Sum metrics by workload (deployment, statefulset, etc.), since pod granularity is not necessary to get the same insights and when higher granularity is needed, the logs can be used
