@@ -4,7 +4,12 @@
 
 ## Why?
 
-Same-zone traffic is free on cloud providers, cross-zone traffic is not, and can easily become a major cost factor if a lot of data is moved over the network. Therefore, understanding which workloads are causing cross-zone traffic is vital.
+While same-zone traffic is free on cloud providers, cross-zone traffic is not and can easily become a major cost factor if a lot of data is moved over the network. Therefore, understanding which workloads are causing cross-zone traffic is vital.
+
+### Articles
+
+Read The New Stack article: [eBPF Tool Identifies Cross-Zone Kubernetes Network Traffic](https://thenewstack.io/ebpf-tool-identifies-cross-zone-kubernetes-network-traffic/)  
+Read our blog post: [kubezonnet: Monitor Cross-Zone Network Traffic in Kubernetes](https://www.polarsignals.com/blog/posts/2025/01/09/introducing-kubezonnet)
 
 ## Deploy
 
@@ -62,7 +67,7 @@ twork traffic associated whenever agents send statistics (every 10 seconds).
 * Currently only supports IPv4.
 * Traffic statistics use the IP packet sizes, therefore skip the IP header part. It's recommended to use these statistics to understand ratios of traffic and not use it for metering purposes or comparing them to other lower level network statistics that include the IP header.
 
-## Roapmap
+## Roadmap
 
 * Support for IPv6.
 * Sum metrics by workload (deployment, statefulset, etc.), since pod granularity is not necessary to get the same insights and when higher granularity is needed, the logs can be used
