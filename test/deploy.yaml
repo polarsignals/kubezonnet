@@ -1,0 +1,105 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-traffic
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-server
+  namespace: test-traffic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-server
+  template:
+    metadata:
+      labels:
+        app: test-server
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: Exists
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - test-client
+            topologyKey: topology.kubernetes.io/zone
+      containers:
+      - name: server
+        image: ghcr.io/polarsignals/kubezonnet-test-workload:latest
+        imagePullPolicy: Always
+        env:
+        - name: MODE
+          value: "server"
+        - name: PORT
+          value: "8888"
+        ports:
+        - containerPort: 8888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-server
+  namespace: test-traffic
+spec:
+  selector:
+    app: test-server
+  ports:
+  - port: 8888
+    targetPort: 8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-client
+  namespace: test-traffic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-client
+  template:
+    metadata:
+      labels:
+        app: test-client
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: Exists
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - test-server
+            topologyKey: topology.kubernetes.io/zone
+      containers:
+      - name: client
+        image: ghcr.io/polarsignals/kubezonnet-test-workload:latest
+        imagePullPolicy: Always
+        env:
+        - name: MODE
+          value: "client"
+        - name: SERVER
+          value: "test-server:8888"
+        - name: CHUNK_SIZE_MB
+          value: "1"
+        - name: INTERVAL_MS
+          value: "100"
