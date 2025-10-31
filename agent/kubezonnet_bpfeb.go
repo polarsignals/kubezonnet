@@ -13,8 +13,10 @@ import (
 )
 
 type kubezonnetIpKey struct {
-	SrcIp  uint32
-	DestIp uint32
+	SrcIp    uint32
+	DestIp   uint32
+	SrcPort  uint16
+	DestPort uint16
 }
 
 type kubezonnetIpValue struct{ PacketSize uint64 }

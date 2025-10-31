@@ -107,7 +107,7 @@ func Run(node, subnetCidr, server string, flushInterval time.Duration, debug, se
 		Program:        objs.NfPostroutingHook,
 	})
 	if err != nil {
-		log.Printf("attach netfilter: %q", err)
+		return fmt.Errorf("attach netfilter: %w", err)
 	}
 	defer link.Close()
 
@@ -155,7 +155,7 @@ func Run(node, subnetCidr, server string, flushInterval time.Duration, debug, se
 				for i := 0; i < len(finalKeys); i++ {
 					srcIP := net.IPv4(byte(finalKeys[i].SrcIP), byte(finalKeys[i].SrcIP>>8), byte(finalKeys[i].SrcIP>>16), byte(finalKeys[i].SrcIP>>24)).String()
 					dstIP := net.IPv4(byte(finalKeys[i].DstIP), byte(finalKeys[i].DstIP>>8), byte(finalKeys[i].DstIP>>16), byte(finalKeys[i].DstIP>>24)).String()
-					fmt.Printf("%s -> %s: %d bytes\n", srcIP, dstIP, finalValues[i].PacketSize)
+					fmt.Printf("%s:%d -> %s:%d: %d bytes\n", srcIP, finalKeys[i].SrcPort, dstIP, finalKeys[i].DstPort, finalValues[i].PacketSize)
 				}
 			}
 

@@ -36,12 +36,13 @@ type NodeInfo struct {
 }
 
 type Server struct {
-	clientset  *kubernetes.Clientset
-	podIpIndex map[uint32]podKey // maps Pod IPv4s to Pod name
-	podIndex   map[podKey]PodInfo
-	nodeIndex  map[string]string // maps node name to Node zone
-	statistics map[podKey]uint64
-	mutex      sync.RWMutex
+	clientset   *kubernetes.Clientset
+	podIpIndex  map[uint32]podKey // maps Pod IPv4s to Pod name
+	nodeIpIndex map[uint32]string // maps Node IPv4s to Node name (for hostNetwork pods)
+	podIndex    map[podKey]PodInfo
+	nodeIndex   map[string]string // maps node name to Node zone
+	statistics  map[podKey]uint64
+	mutex       sync.RWMutex
 }
 
 func main() {
@@ -60,11 +61,12 @@ func main() {
 	}
 
 	server := &Server{
-		clientset:  clientset,
-		podIpIndex: map[uint32]podKey{},
-		podIndex:   map[podKey]PodInfo{},
-		nodeIndex:  map[string]string{},
-		statistics: map[podKey]uint64{},
+		clientset:   clientset,
+		podIpIndex:  map[uint32]podKey{},
+		nodeIpIndex: map[uint32]string{},
+		podIndex:    map[podKey]PodInfo{},
+		nodeIndex:   map[string]string{},
+		statistics:  map[podKey]uint64{},
 	}
 
 	// Start watching Pods and Nodes
@@ -160,6 +162,15 @@ func (s *Server) handlePod(obj interface{}) {
 		return
 	}
 
+	// Get the host IP to check for hostNetwork pods
+	var hostIP uint32
+	if pod.Status.HostIP != "" {
+		parsedHostIP := net.ParseIP(pod.Status.HostIP)
+		if parsedHostIP != nil && parsedHostIP.To4() != nil {
+			hostIP = ipToUint32(parsedHostIP)
+		}
+	}
+
 	ips := make([]uint32, 0, len(pod.Status.PodIPs))
 	for _, podIP := range pod.Status.PodIPs {
 		ip := net.ParseIP(podIP.IP)
@@ -180,9 +191,15 @@ func (s *Server) handlePod(obj interface{}) {
 		IPs:  ips,
 	}
 	for _, ip := range ips {
-		s.podIpIndex[ip] = podKey{
-			namespace: pod.Namespace,
-			name:      pod.Name,
+		// If the pod IP matches the host IP, it's using hostNetwork
+		// In this case, use the node as the key instead of the pod
+		if hostIP != 0 && ip == hostIP {
+			s.nodeIpIndex[ip] = pod.Spec.NodeName
+		} else {
+			s.podIpIndex[ip] = podKey{
+				namespace: pod.Namespace,
+				name:      pod.Name,
+			}
 		}
 	}
 	s.mutex.Unlock()
@@ -206,11 +223,25 @@ func (s *Server) onPodDelete(obj interface{}) {
 		namespace: pod.Namespace,
 		name:      pod.Name,
 	}
+
+	// Get the host IP to check for hostNetwork pods
+	var hostIP uint32
+	if pod.Status.HostIP != "" {
+		parsedHostIP := net.ParseIP(pod.Status.HostIP)
+		if parsedHostIP != nil && parsedHostIP.To4() != nil {
+			hostIP = ipToUint32(parsedHostIP)
+		}
+	}
+
 	s.mutex.Lock()
 	info, found := s.podIndex[k]
 	if found {
 		for _, ip := range info.IPs {
-			delete(s.podIpIndex, ip)
+			// Only delete from podIpIndex if it's not a host IP
+			// Host IPs are in nodeIpIndex and shared across hostNetwork pods
+			if hostIP == 0 || ip != hostIP {
+				delete(s.podIpIndex, ip)
+			}
 		}
 		delete(s.podIndex, k)
 	}
@@ -252,16 +283,26 @@ func (s *Server) onNodeDelete(obj interface{}) {
 	if !ok {
 		return
 	}
+
+	// Get node's IP addresses and remove them from nodeIpIndex
 	s.mutex.Lock()
+	// Clean up any node IPs associated with this node
+	for ip, nodeName := range s.nodeIpIndex {
+		if nodeName == node.Name {
+			delete(s.nodeIpIndex, ip)
+		}
+	}
 	delete(s.nodeIndex, node.Name)
 	s.mutex.Unlock()
 	log.Printf("Node deleted: %s", node.Name)
 }
 
 type flowLog struct {
-	src   podKey
-	dst   podKey
-	bytes int
+	src     podKey
+	srcPort int
+	dst     podKey
+	dstPort int
+	bytes   int
 }
 
 func (s *Server) handlePayload(w http.ResponseWriter, r *http.Request) {
@@ -287,41 +328,75 @@ func (s *Server) handlePayload(w http.ResponseWriter, r *http.Request) {
 	s.mutex.Lock()
 
 	for _, entry := range data {
-		sourcePodKey, found := s.podIpIndex[entry.SrcIP]
-		if !found {
-			continue
+		// Try to find source in pod index first
+		sourcePodKey, foundPod := s.podIpIndex[entry.SrcIP]
+		var srcNode string
+		var srcZone string
+
+		if foundPod {
+			// Source is a regular pod
+			sourcePod, found := s.podIndex[sourcePodKey]
+			if !found {
+				continue
+			}
+			srcNode = sourcePod.Node
+			srcZone, found = s.nodeIndex[srcNode]
+			if !found {
+				continue
+			}
+		} else {
+			// Check if source is a node (hostNetwork pod)
+			srcNode, foundPod = s.nodeIpIndex[entry.SrcIP]
+			if !foundPod {
+				continue
+			}
+			// Use special podKey for node
+			sourcePodKey = podKey{namespace: "_node_", name: srcNode}
+			var found bool
+			srcZone, found = s.nodeIndex[srcNode]
+			if !found {
+				continue
+			}
 		}
 
-		sourcePod, found := s.podIndex[sourcePodKey]
-		if !found {
-			continue
-		}
+		// Try to find destination in pod index first
+		dstPodKey, foundPod := s.podIpIndex[entry.DstIP]
+		var dstNode string
+		var dstZone string
 
-		srcZone, found := s.nodeIndex[sourcePod.Node]
-		if !found {
-			continue
-		}
-
-		dstPodKey, found := s.podIpIndex[entry.DstIP]
-		if !found {
-			continue
-		}
-
-		dstPod, found := s.podIndex[dstPodKey]
-		if !found {
-			continue
-		}
-
-		dstZone, found := s.nodeIndex[dstPod.Node]
-		if !found {
-			continue
+		if foundPod {
+			// Destination is a regular pod
+			dstPod, found := s.podIndex[dstPodKey]
+			if !found {
+				continue
+			}
+			dstNode = dstPod.Node
+			dstZone, found = s.nodeIndex[dstNode]
+			if !found {
+				continue
+			}
+		} else {
+			// Check if destination is a node (hostNetwork pod)
+			dstNode, foundPod = s.nodeIpIndex[entry.DstIP]
+			if !foundPod {
+				continue
+			}
+			// Use special podKey for node
+			dstPodKey = podKey{namespace: "_node_", name: dstNode}
+			var found bool
+			dstZone, found = s.nodeIndex[dstNode]
+			if !found {
+				continue
+			}
 		}
 
 		if srcZone != dstZone {
 			flowLogs = append(flowLogs, flowLog{
-				src:   sourcePodKey,
-				dst:   dstPodKey,
-				bytes: int(entry.Traffic),
+				src:     sourcePodKey,
+				srcPort: int(entry.SrcPort),
+				dst:     dstPodKey,
+				dstPort: int(entry.DstPort),
+				bytes:   int(entry.Traffic),
 			})
 			s.statistics[sourcePodKey] += uint64(entry.Traffic)
 		}
@@ -330,7 +405,7 @@ func (s *Server) handlePayload(w http.ResponseWriter, r *http.Request) {
 	s.mutex.Unlock()
 
 	for _, flowLog := range flowLogs {
-		log.Println(flowLog.src, "to", flowLog.dst, "with", strconv.Itoa(flowLog.bytes), "bytes")
+		log.Println(flowLog.src, "from port", flowLog.srcPort, "to", flowLog.dst, "at port", flowLog.dstPort, "with", strconv.Itoa(flowLog.bytes), "bytes")
 	}
 }
 

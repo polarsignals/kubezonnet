@@ -1,7 +1,7 @@
 //go:build ignore
 #include "vmlinux.h"
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_endian.h>
+#include <bpf_helpers.h>
+#include <bpf_endian.h>
 
 #define NF_DROP         0
 #define NF_ACCEPT       1
@@ -19,6 +19,8 @@ extern void *bpf_dynptr_slice(const struct bpf_dynptr *ptr, uint32_t offset,
 struct ip_key {
     __u32 src_ip;
     __u32 dest_ip;
+    __u16 src_port;
+    __u16 dest_port;
 };
 
 struct ip_value {
@@ -53,6 +55,21 @@ static int handle_v4(struct __sk_buff *skb)
         struct ip_key key = {};
         key.src_ip = ip->saddr;
         key.dest_ip = ip->daddr;
+        key.src_port = 0;
+        key.dest_port = 0;
+
+        // Extract ports for TCP and UDP
+        __u8 protocol = ip->protocol;
+        __u8 ihl = ip->ihl;
+        if (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP) {
+            // TCP and UDP headers both have ports at the same offset (first 4 bytes)
+            u8 port_buf[4] = {};
+            __u16 *ports = bpf_dynptr_slice(&ptr, ihl * 4, port_buf, sizeof(port_buf));
+            if (ports) {
+                key.src_port = bpf_ntohs(ports[0]);
+                key.dest_port = bpf_ntohs(ports[1]);
+            }
+        }
 
         __u64 packet_size = (__u64)(ip->tot_len);
 
