@@ -71,7 +71,7 @@ static int handle_v4(struct __sk_buff *skb)
             }
         }
 
-        __u64 packet_size = (__u64)(ip->tot_len);
+        __u64 packet_size = (__u64)bpf_ntohs(ip->tot_len);
 
         // Lookup or initialize the value in the map
         struct ip_value *value = bpf_map_lookup_elem(&ip_map, &key);
