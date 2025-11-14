@@ -111,6 +111,10 @@ kind: Service
 metadata:
   name: kubezonnet-server
   namespace: kubezonnet
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/instance: main
+    app.kubernetes.io/name: kubezonnet
 spec:
   selector:
     app.kubernetes.io/component: server
