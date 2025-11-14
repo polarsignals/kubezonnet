@@ -12,6 +12,10 @@ spec:
   endpoints:
   - interval: 15s
     port: http
+    relabelings:
+    - action: labeldrop
+      regex: (container|namespace|pod|service)
   selector:
     matchLabels:
       app.kubernetes.io/name: kubezonnet
+
