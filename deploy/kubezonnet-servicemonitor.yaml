@@ -1,0 +1,17 @@
+# This is an optional component that can be deployed if the Prometheus Operator is used
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: kubezonnet
+    app.kubernetes.io/version: main
+  name: kubezonnet-server
+  namespace: kubezonnet
+spec:
+  endpoints:
+  - interval: 15s
+    port: http
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubezonnet
